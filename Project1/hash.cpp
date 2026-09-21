@@ -1,12 +1,10 @@
-#ifndef _HASH_H
-#define _HASH_H
-
+#include "hash.h"
 #include <vector>
 #include <string>
 
 #include <stdio.h>
 
-class hashTable{
+/*class hashTable{
     hashTable(int size = 0);
     int insert(const std::string &key, void *pv = nullptr);
     bool contains(const std::string &key);
@@ -25,9 +23,12 @@ class hashTable{
         public:
         hashItem(std::string key);
         hashItem(std::string key, void* pv);
-        std::string getkey(){return key;};
-        bool getOcc(){return isOccupied;};
-        bool getDel(){return isDeleted;};
+        std::string getkey(){return key;}
+        void setpv(void *p){pv = p;}
+        void *getpv(){return pv;}
+        bool getOcc(){return isOccupied;}
+        bool getDel(){return isDeleted;}
+        void flagAsDelete(){isDeleted = true;}
     };
     
     int capacity;
@@ -35,17 +36,47 @@ class hashTable{
     
     std::vector<hashItem> data;
 
-    int hash(const std::string &key);
+    int hash(const std::string &key){
+        //FNV hash function
+        int FNV_PRIME = 0x01000193;
+        int FNV_OFFSET_BASIS = 0x811c9dc5;
 
-    int findPos(const std::string &key);
-    bool rehash();
+        int hash = FNV_OFFSET_BASIS;
+
+        for(char c : key) {
+            hash ^= static_cast<int>(c);
+            hash *= FNV_PRIME;
+        }
+
+        return hash % capacity;
+    }
+    
+
+    int findPos(const std::string &key){
+        int initial_index, current_index = hash(key);
+        do {
+            if(data[current_index].getDel()){
+                current_index++;
+                continue;
+            }
+            if(data.at(current_index).getkey() == key){ //comp string
+                return current_index;
+            }
+            else if(current_index == capacity){
+                current_index = 0;
+            }
+            else{
+                current_index++;
+            }
+        } while(initial_index != current_index);
+        return -1;
+    }
+ 
+    bool rehash(){
+        bool a = data[0].isOccupied;
+    }
     static unsigned int getPrime(int size);
-};
-
-hashTable::hashItem::hashItem(std::string key, void *pv = nullptr){ 
-    key = key;
-    pv = pv;
-}
+};*/
 
 hashTable :: hashTable(int size){
     //get the prime first
@@ -54,6 +85,7 @@ hashTable :: hashTable(int size){
     capacity = prime;
     data.resize(prime);
 }
+
 int hashTable::insert(const std::string &key, void *pv = nullptr){
     if (findPos(key) < 0){
         return 1;
@@ -63,29 +95,54 @@ int hashTable::insert(const std::string &key, void *pv = nullptr){
         return 2;        
     }
     int index = hash(key);
-    while(data.at(index).getOcc() != false){
+    while(data.at(index).isOccupied != false){
         index++;
     }
-    data.insert(data.begin() + index, hashItem(key, pv));
+    data[index] = hashItem();
+    data[index].key = key;
+    data[index].isOccupied = true;
+    data[index].pv = pv;
 }
 bool hashTable::contains(const std::string &key){ //findPos function
-    int initial_index, current_index = hash(key);
-    do {
-        if(data.at(current_index).getkey() == key){ //comp string
-            return true;
-        }
-        else if(current_index == capacity){
-            current_index = 0;
-        }
-        else{
-            current_index++;
-        }
-    } while(initial_index != current_index);
-    return false;
+    return !(findPos(key)<0);
 }
 
 void* hashTable::getPointer(const std::string &key, bool *b = nullptr){
-       
+    int i = findPos(key);
+    if(b != nullptr){
+        if(i<0){
+            *b = false;
+        }
+        else{
+            *b = true;
+        }
+    }
+    if (i<0){
+        return nullptr;
+    }
+    else{
+        return data[i].pv;
+    }
+}
+int hashTable::setPointer(const std::string &key, void *pv){
+    int i = findPos(key);
+    if(i<0){
+        return 1;
+    }
+    else{
+        data[i].pv = pv;
+        return 0;
+    }
 }
 
-#endif //_HASH_H
+bool hashTable::remove(const std::string &key){
+    int i = findPos(key);
+    if(i<0){
+        return false;
+    }
+    else{;
+        data[i].isDeleted = true;
+        return true;
+    }
+}
+
