@@ -4,85 +4,100 @@
 
 #include <stdio.h>
 
-/*class hashTable{
-    hashTable(int size = 0);
-    int insert(const std::string &key, void *pv = nullptr);
-    bool contains(const std::string &key);
-    void *getPointer(const std::string &key, bool *b = nullptr);
-    int setPointer(const std::string &key, void *pv);
-    bool remove(const std::string &key);
+int hashTable::hash(const std::string &key){
+    //FNV hash function
+    int FNV_PRIME = 0x01000193;
+    int FNV_OFFSET_BASIS = 0x811c9dc5;
 
-    private:
-    class hashItem{
-        std::string key{""};
-        bool isOccupied {false};
-        bool isDeleted {false};
-        void *pv {nullptr};
-        
-        hashItem() = default;
-        public:
-        hashItem(std::string key);
-        hashItem(std::string key, void* pv);
-        std::string getkey(){return key;}
-        void setpv(void *p){pv = p;}
-        void *getpv(){return pv;}
-        bool getOcc(){return isOccupied;}
-        bool getDel(){return isDeleted;}
-        void flagAsDelete(){isDeleted = true;}
-    };
-    
-    int capacity;
-    int filled;
-    
-    std::vector<hashItem> data;
+    int hash = FNV_OFFSET_BASIS;
 
-    int hash(const std::string &key){
-        //FNV hash function
-        int FNV_PRIME = 0x01000193;
-        int FNV_OFFSET_BASIS = 0x811c9dc5;
-
-        int hash = FNV_OFFSET_BASIS;
-
-        for(char c : key) {
-            hash ^= static_cast<int>(c);
-            hash *= FNV_PRIME;
-        }
-
-        return hash % capacity;
+    for(char c : key) {
+        hash ^= static_cast<int>(c);
+        hash *= FNV_PRIME;
     }
+
+    return hash % capacity;
+}
     
 
-    int findPos(const std::string &key){
-        int initial_index, current_index = hash(key);
-        do {
-            if(data[current_index].getDel()){
-                current_index++;
+int hashTable::findPos(const std::string &key){
+    int initial_index, current_index = hash(key);
+    do {
+        if(data[current_index].isDeleted){
+            current_index++;
+            continue;
+        }
+        if(data.at(current_index).key == key){ //comp string
+            return current_index;
+        }
+        else if(current_index == capacity){
+            current_index = 0;
+        }
+        else{
+            current_index++;
+        }
+    } while(initial_index != current_index);
+    return -1;
+}
+
+bool hashTable::rehash(){
+    std::vector<hashItem> temp;
+    int oldCapacity = capacity;
+    capacity = getPrime(capacity+1);
+    try{
+        temp.resize(capacity); //does this reserve memory too?
+        for(int i = 0; i < oldCapacity; i++){
+            hashItem cur = data[i];
+            if (cur.isDeleted || !cur.isOccupied){
                 continue;
             }
-            if(data.at(current_index).getkey() == key){ //comp string
-                return current_index;
-            }
-            else if(current_index == capacity){
-                current_index = 0;
-            }
             else{
-                current_index++;
+                int newIndex = hash(cur.key);
+                temp[newIndex] = cur;
             }
-        } while(initial_index != current_index);
-        return -1;
+        }
+        std::swap(temp,data);
+        return true;
+    } 
+    catch(...){
+        return false;
     }
- 
-    bool rehash(){
-        bool a = data[0].isOccupied;
+}
+unsigned int hashTable::getPrime(int size){
+    int primes[] = {
+        53,
+        97,
+        193,
+        389,
+        769,
+        1543,
+        3079,
+        6151,
+        12289,
+        24593,
+        49157,
+        98317,
+        196613,
+        393241,
+        786433,
+        1572869,
+        3145739,
+        6291469  
+    };
+
+    for (int i : primes){
+        if (i>size){
+            return i;
+        }
     }
-    static unsigned int getPrime(int size);
-};*/
+    return primes[16];
+}
 
 hashTable :: hashTable(int size){
     //get the prime first
     int prime = hashTable::getPrime(size);
     filled = 0;
-    capacity = prime;
+    capacity = getPrime(size);
     data.resize(prime);
 }
 
