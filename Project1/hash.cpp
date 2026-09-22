@@ -1,22 +1,20 @@
 #include "hash.h"
 #include <vector>
 #include <string>
-
+#include<cstdint>
 #include <stdio.h>
 
 int hashTable::hash(const std::string &key){
     //FNV hash function
-    int FNV_PRIME = 0x01000193;
-    int FNV_OFFSET_BASIS = 0x811c9dc5;
+    const uint32_t FNV_PRIME = 0x01000193;
+    uint32_t FNV_OFFSET_BASIS = 0x811c9dc5;
 
-    int hash = FNV_OFFSET_BASIS;
-
-    for(char c : key) {
-        hash ^= static_cast<int>(c);
-        hash *= FNV_PRIME;
+    for(unsigned char c : key) {
+        FNV_OFFSET_BASIS ^= static_cast<int>(c);
+        FNV_OFFSET_BASIS *= FNV_PRIME;
     }
 
-    return static_cast<int>(hash % capacity); //cast ensures returned hash is positive int
+    return FNV_OFFSET_BASIS % capacity;
 }
     
 
@@ -41,17 +39,21 @@ int hashTable::findPos(const std::string &key){
 bool hashTable::rehash(){
     std::vector<hashItem> temp;
     int oldCapacity = capacity;
+    int oldFilled = filled;
     capacity = getPrime(capacity+1);
     filled = 0;
     try{
         temp.resize(capacity); //does this reserve memory too?
         for(int i = 0; i < oldCapacity; i++){
-            hashItem cur = data[i];
+            const hashItem &cur = data[i];
             if (cur.isDeleted || !cur.isOccupied){
                 continue;
             }
             else{
                 int newIndex = hash(cur.key);
+                while (temp[newIndex].isOccupied && !temp[newIndex].isDeleted) {
+                    newIndex = (newIndex + 1) % capacity;
+                }
                 temp[newIndex] = cur;
                 filled++;
             }
@@ -60,6 +62,8 @@ bool hashTable::rehash(){
         return true;
     } 
     catch(...){
+        capacity = oldCapacity;
+        filled = oldFilled;
         return false;
     }
 }
@@ -76,6 +80,7 @@ unsigned int hashTable::getPrime(int size){
         12289,
         24593,
         49157,
+        50021,
         98317,
         196613,
         393241,
@@ -86,27 +91,26 @@ unsigned int hashTable::getPrime(int size){
     };
 
     for (int i : primes){
-        if (i>size){
+        if (i > size){
             return i;
         }
     }
-    return primes[16];
+    return primes[18];
 }
 
-hashTable :: hashTable(int size){
+hashTable::hashTable(int size){
     //get the prime first
-    int prime = hashTable::getPrime(size);
     filled = 0;
     capacity = getPrime(size);
-    data.resize(prime);
+    data.resize(capacity);
 }
 
 int hashTable::insert(const std::string &key, void *pv){
-    if (findPos(key) < 0){
+    if (findPos(key) >= 0){
         return 1;
     }
     if((double)(filled+1)/capacity > 0.5){ //load factor  
-        if(rehash() < 0){
+        if(!rehash()){
             return 2;
         }        
     }
