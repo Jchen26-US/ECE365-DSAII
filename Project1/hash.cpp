@@ -16,27 +16,25 @@ int hashTable::hash(const std::string &key){
         hash *= FNV_PRIME;
     }
 
-    return hash % capacity;
+    return static_cast<int>(hash % capacity); //cast ensures returned hash is positive int
 }
     
 
 int hashTable::findPos(const std::string &key){
-    int initial_index, current_index = hash(key);
+    int initial_index = hash(key);
+    int current_index = initial_index;
     do {
-        if(data[current_index].isDeleted){
-            current_index++;
-            continue;
+        if (!data[current_index].isOccupied && !data[current_index].isDeleted) {
+            return -1;
         }
-        if(data.at(current_index).key == key){ //comp string
-            return current_index;
+
+        if (data[current_index].isOccupied && !data[current_index].isDeleted) {
+            if (data[current_index].key == key) {
+                return current_index;
+            }
         }
-        else if(current_index == capacity){
-            current_index = 0;
-        }
-        else{
-            current_index++;
-        }
-    } while(initial_index != current_index);
+        current_index = (current_index + 1) % capacity;
+    } while (current_index != initial_index);
     return -1;
 }
 
@@ -44,6 +42,7 @@ bool hashTable::rehash(){
     std::vector<hashItem> temp;
     int oldCapacity = capacity;
     capacity = getPrime(capacity+1);
+    filled = 0;
     try{
         temp.resize(capacity); //does this reserve memory too?
         for(int i = 0; i < oldCapacity; i++){
@@ -54,6 +53,7 @@ bool hashTable::rehash(){
             else{
                 int newIndex = hash(cur.key);
                 temp[newIndex] = cur;
+                filled++;
             }
         }
         std::swap(temp,data);
@@ -101,28 +101,31 @@ hashTable :: hashTable(int size){
     data.resize(prime);
 }
 
-int hashTable::insert(const std::string &key, void *pv = nullptr){
+int hashTable::insert(const std::string &key, void *pv){
     if (findPos(key) < 0){
         return 1;
     }
     if((double)(filled+1)/capacity > 0.5){ //load factor  
-        if(rehash() < 0);
-        return 2;        
+        if(rehash() < 0){
+            return 2;
+        }        
     }
     int index = hash(key);
-    while(data.at(index).isOccupied != false){
-        index++;
+    while(data[index].isOccupied && !data[index].isDeleted){
+        index = (index + 1) % capacity;
     }
     data[index] = hashItem();
     data[index].key = key;
     data[index].isOccupied = true;
     data[index].pv = pv;
+    filled++;
+    return 0;
 }
 bool hashTable::contains(const std::string &key){ //findPos function
     return !(findPos(key)<0);
 }
 
-void* hashTable::getPointer(const std::string &key, bool *b = nullptr){
+void* hashTable::getPointer(const std::string &key, bool *b){
     int i = findPos(key);
     if(b != nullptr){
         if(i<0){
@@ -150,7 +153,7 @@ int hashTable::setPointer(const std::string &key, void *pv){
     }
 }
 
-bool hashTable::remove(const std::string &key){
+bool hashTable::remove(const std::string &key){//lazy deletion, do not deincrement filled
     int i = findPos(key);
     if(i<0){
         return false;
